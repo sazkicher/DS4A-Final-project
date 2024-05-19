@@ -1,0 +1,153 @@
+# Import libraries
+import os
+from dash import Dash, callback, html, dcc, dash_table, Input, Output, State, MATCH, ALL
+import dash_bootstrap_components as dbc
+from dash_labs.plugins.pages import register_page
+from matplotlib.pyplot import figimage
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+import json
+import pathlib
+from components.data.load_df import cartera
+from components.data.create_df import create_df, filter_df, filter_idx
+from components.plots.line_plots import line_plot_range, line_plot_two_axis
+
+register_page(__name__, path='/cartera')
+
+# Loading the data
+PATH = pathlib.Path(__file__).parent
+DATA_PATH = PATH.joinpath('../datasets').resolve()
+cierre_cart = cartera(DATA_PATH, 'allCierreCartera.csv')
+
+# Creating figures
+## fig 1
+df = filter_df(df=cierre_cart, x=['dia_pago'], y='dia_pago', filters=[], agg_function='count', to_frame='count')
+
+fig1 = px.bar(df, x='dia_pago', y='count', title='Número de pagos por día', 
+              labels={'count':'Pagos', 'dia_pago':'Día'})
+
+## fig 2
+df = filter_df(df=cierre_cart, x=['dia_semana'], y='dia_semana', filters=[], agg_function='count', to_frame='count')
+
+fig2 = px.bar(df, x='dia_semana', y='count', title='Cantidad de pagos por tipo de día',
+              labels={'count':'Pagos', 'dia_semana':'Dia de la semana'})
+
+## fig 3
+df = filter_df(df=cierre_cart, x=['dia_pago'], y=['valor cuota'], filters=[], agg_function='sum')
+
+fig3 = px.bar(df, x='dia_pago', y='valor cuota', title='Total de pagos por día del mes',
+              labels={'valor cuota':'Total pagado', 'dia_pago':'Día'})
+
+## fig 4
+df = filter_df(df=cierre_cart, x=['region'], y=['valor cuota'], filters=[], agg_function='sum')
+
+fig4 = px.bar(df, x='region', y='valor cuota', title='Total de pagos por region',
+              labels={'valor cuota':'Total pagado'})
+
+## fig 5
+df = filter_df(df=cierre_cart, x=['sucursal real'], y=['valor cuota'], filters=[], agg_function='sum')
+
+fig5 = px.bar(df, x='sucursal real', y='valor cuota', title='Total de pago por Sucursal real',
+              labels={'valor cuota':'Total pagado'})
+
+## fig 6
+df = filter_df(df=cierre_cart, x=['municipio cliente'], y=['valor cuota'], filters=[], agg_function='sum')
+
+fig6 = px.bar(df, x='municipio cliente', y='valor cuota', title='Total de pago por municipio')
+
+## fig 7
+df = filter_df(df=cierre_cart, x=['periodicidad'], y=['valor cuota'], filters=[], agg_function='sum')
+
+fig7 = px.bar(df, x='periodicidad', y='valor cuota', title='Pago por periodicidad')
+
+## fig 8
+df = filter_df(df=cierre_cart, x=['periodicidad'], y='valor cuota', filters=[], agg_function='count', to_frame='count')
+
+fig8 = px.bar(df, x='periodicidad', y='count', title='Número de cuotas por periodicidad')
+
+# Filter values
+region_list = cierre_cart['region'].dropna().unique()
+linea_list = cierre_cart['linea'].dropna().unique()
+estrato_list = cierre_cart['estrato'].dropna().unique()
+municipio_list = cierre_cart['municipio cliente'].dropna().unique()
+profesion_list = cierre_cart['profesion'].dropna().unique()
+
+# Layout
+layout = html.Div([
+    dbc.Row([
+        dbc.Col([dcc.Dropdown(id='municipio_dropdown', options=municipio_list, placeholder='Municipio')], width=2),
+        dbc.Col([dcc.Dropdown(id='linea_dropdown', options=linea_list, placeholder='Línea')], width=2),
+        dbc.Col([dcc.Dropdown(id='estrato_dropdown', options=estrato_list, placeholder='Estrato')], width=2),
+        dbc.Col([dcc.Dropdown(id='profesion_dropdown', options=profesion_list, placeholder='Profesión')], width=2),
+        dbc.Col([dbc.Button(['Filtrar'], id='button_filter')], width=2),
+        ], justify='end'),
+    dbc.Row(html.Hr(style={'border': '2px solid green'})),
+    dbc.Row([
+        dbc.Col(dcc.Graph(figure=fig1, id='main-figure1_cart')),
+        dbc.Col(dcc.Graph(figure=fig2, id='main-figure2_cart')),
+        ]),
+    dbc.Row([
+        dbc.Col(dcc.Graph(figure=fig3, id='main-figure3_cart')),
+        dbc.Col(dcc.Graph(figure=fig4, id='main-figure4_cart')),
+        ]),
+    dbc.Row([
+        dbc.Col(dcc.Graph(figure=fig5, id='main-figure5_cart')),
+        dbc.Col(dcc.Graph(figure=fig6, id='main-figure6_cart')),
+        ]),
+    dbc.Row([
+        dbc.Col(dcc.Graph(figure=fig7, id='main-figure7_cart')),
+        dbc.Col(dcc.Graph(figure=fig8, id='main-figure8_cart')),
+        ]),
+    ])
+
+@callback(Output('main-figure1_cart', 'figure'), Output('main-figure2_cart', 'figure'),
+          Output('main-figure3_cart', 'figure'), Output('main-figure4_cart', 'figure'),
+          Output('main-figure5_cart', 'figure'), Output('main-figure6_cart', 'figure'),
+          Output('main-figure7_cart', 'figure'), Output('main-figure8_cart', 'figure'),
+          Input('municipio_dropdown', 'value'), Input('linea_dropdown', 'value'),
+          Input('estrato_dropdown', 'value'), Input('profesion_dropdown', 'value'),
+          Input('button_filter', 'n_clicks'),
+          prevent_initial_call=True)
+def update_figs(municipio, linea, estrato, profesion, nclicks):
+    filters = ['municipio cliente', 'linea', 'estrato', 'profesion']
+    filter_values = [municipio, linea, estrato, profesion]
+
+    df = filter_df(df=cierre_cart, x=['dia_pago'], y='dia_pago', filters=filters, agg_function='count', to_frame='count', filter_values=filter_values)
+
+    fig1 = px.bar(df, x='dia_pago', y='count', title='Número de pagos por día', 
+              labels={'count':'Pagos', 'dia_pago':'Día'})
+
+    df = filter_df(df=cierre_cart, x=['dia_semana'], y='dia_semana', filters=filters, agg_function='count', to_frame='count', filter_values=filter_values)
+
+    fig2 = px.bar(df, x='dia_semana', y='count', title='Cantidad de pagos por tipo de día',
+              labels={'count':'Pagos', 'dia_semana':'Dia de la semana'})
+    
+    df = filter_df(df=cierre_cart, x=['dia_pago'], y=['valor cuota'], filters=filters, agg_function='sum', filter_values=filter_values)
+
+    fig3 = px.bar(df, x='dia_pago', y='valor cuota', title='Total de pagos por día del mes',
+              labels={'valor cuota':'Total pagado', 'dia_pago':'Día'})
+
+    df = filter_df(df=cierre_cart, x=['region'], y=['valor cuota'], filters=filters, agg_function='sum', filter_values=filter_values)
+
+    fig4 = px.bar(df, x='region', y='valor cuota', title='Total de pagos por region',
+              labels={'valor cuota':'Total pagado'})
+
+    df = filter_df(df=cierre_cart, x=['sucursal real'], y=['valor cuota'], filters=filters, agg_function='sum', filter_values=filter_values)
+
+    fig5 = px.bar(df, x='sucursal real', y='valor cuota', title='Total de pago por Sucursal real',
+              labels={'valor cuota':'Total pagado'})
+    
+    df = filter_df(df=cierre_cart, x=['municipio cliente'], y=['valor cuota'], filters=filters, agg_function='sum', filter_values=filter_values)
+
+    fig6 = px.bar(df, x='municipio cliente', y='valor cuota', title='Total de pago por municipio')
+
+    df = filter_df(df=cierre_cart, x=['periodicidad'], y=['valor cuota'], filters=filters, agg_function='sum', filter_values=filter_values)
+
+    fig7 = px.bar(df, x='periodicidad', y='valor cuota', title='Pago por periodicidad')
+
+    df = filter_df(df=cierre_cart, x=['periodicidad'], y='valor cuota', filters=filters, agg_function='count', to_frame='count', filter_values=filter_values)
+
+    fig8 = px.bar(df, x='periodicidad', y='count', title='Número de cuotas por periodicidad')
+    
+    return [fig1, fig2, fig3, fig4, fig5, fig6, fig7, fig8]
